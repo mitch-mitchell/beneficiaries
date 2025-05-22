@@ -423,14 +423,26 @@ const BeneficiaryDesignationAPI = () => {
                   <div className="flex items-center gap-4">
                     <h4 className="font-semibold text-gray-900">Beneficiaries</h4>
                     {account.beneficiaries.length > 0 && (
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        totalPercentage === 100 
-                          ? 'bg-green-100 text-green-800' 
-                          : totalPercentage > 100 
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        Total: {totalPercentage}%
+                      <div className="flex items-center gap-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          totalPercentage === 100 
+                            ? 'bg-green-100 text-green-800' 
+                            : totalPercentage > 100 
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          Total: {totalPercentage}%
+                        </div>
+                        {totalPercentage !== 100 && (
+                          <div className="flex items-center gap-1 text-sm text-red-600">
+                            <AlertCircle size={16} />
+                            <span>
+                              {totalPercentage > 100 
+                                ? 'Total exceeds 100%. Cannot submit until fixed.' 
+                                : 'Total must equal 100% to submit changes.'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -447,7 +459,17 @@ const BeneficiaryDesignationAPI = () => {
                 </div>
 
                 {account.beneficiaries.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No beneficiaries designated</p>
+                  <div className="text-center py-6">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-800 rounded-lg font-medium">
+                        <AlertCircle size={20} />
+                        <span>No Beneficiary Designation</span>
+                      </div>
+                      <p className="text-gray-500">
+                        This account has no beneficiaries designated. Add beneficiaries to ensure proper estate planning.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {account.beneficiaries.map(beneficiary => (
@@ -497,12 +519,19 @@ const BeneficiaryDesignationAPI = () => {
                   {getInstitutionStatus(account.institution) ? (
                     <button
                       onClick={() => openSubmitModal(account)}
-                      disabled={!account.hasUnsavedChanges}
+                      disabled={!account.hasUnsavedChanges || totalPercentage !== 100}
                       className={`px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors ${
-                        account.hasUnsavedChanges 
+                        account.hasUnsavedChanges && totalPercentage === 100
                           ? 'bg-blue-600 hover:bg-blue-700 text-white'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
+                      title={
+                        !account.hasUnsavedChanges 
+                          ? 'No changes to submit'
+                          : totalPercentage !== 100
+                            ? 'Cannot submit - beneficiary percentages must total 100%'
+                            : 'Submit changes to institution'
+                      }
                     >
                       <Send size={14} />
                       Submit Changes
