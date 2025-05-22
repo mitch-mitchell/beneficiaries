@@ -1,4 +1,4 @@
-name = "beneficiary-designation-api"
+name = "beneficiaries"
 compatibility_date = "2024-01-15"
 
 # Static assets configuration for Pages/Workers
