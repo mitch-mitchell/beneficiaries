@@ -1,0 +1,20 @@
+name = "beneficiary-designation-api"
+compatibility_date = "2024-01-15"
+
+[env.production]
+name = "beneficiary-designation-api"
+
+[env.staging]
+name = "beneficiary-designation-api-staging"
+
+# Pages configuration
+pages_build_output_dir = "dist"
+
+# Optional: Custom domain configuration (uncomment and modify as needed)
+# [[env.production.routes]]
+# pattern = "yourapp.com"
+# custom_domain = true
+
+# Environment variables (set these via Cloudflare dashboard or wrangler secrets)
+# [vars]
+# NODE_ENV = "production"
