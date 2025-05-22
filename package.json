@@ -1,6 +1,7 @@
 {
   "name": "beneficiary-designation-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "A proof of concept for beneficiary designation management across financial institutions",
   "main": "src/index.js",
   "scripts": {
@@ -33,10 +34,10 @@
     "fintech",
     "estate-planning"
   ],
-  "author": "Your Name",
+  "author": "Mitch Mitchell",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/beneficiary-designation-api.git"
+    "url": "https://github.com/mitch-mitchell/beneficiaries.git"
   }
 }
