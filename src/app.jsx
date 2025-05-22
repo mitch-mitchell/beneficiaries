@@ -106,7 +106,9 @@ const BeneficiaryDesignationAPI = () => {
 
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddBeneficiary, setShowAddBeneficiary] = useState(false);
+  const [showEditBeneficiary, setShowEditBeneficiary] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [editingBeneficiary, setEditingBeneficiary] = useState(null);
   const [newAccount, setNewAccount] = useState({
     accountNumber: '',
     accountType: '',
@@ -120,6 +122,17 @@ const BeneficiaryDesignationAPI = () => {
     ssn: '',
     isPrimary: true
   });
+  const [editBeneficiary, setEditBeneficiary] = useState({
+    name: '',
+    relationship: '',
+    percentage: '',
+    ssn: '',
+    isPrimary: true
+  });
+
+  const calculateTotalPercentage = (beneficiaries) => {
+    return beneficiaries.reduce((total, beneficiary) => total + beneficiary.percentage, 0);
+  };
 
   const handleAddAccount = () => {
     if (!newAccount.accountNumber || !newAccount.accountType || !newAccount.institution) return;
@@ -181,6 +194,85 @@ const BeneficiaryDesignationAPI = () => {
     }, ...auditLog]);
   };
 
+  const handleEditBeneficiary = () => {
+    if (!editBeneficiary.name || !editBeneficiary.relationship || !editBeneficiary.percentage) return;
+    
+    const updatedBeneficiary = {
+      ...editingBeneficiary,
+      name: editBeneficiary.name,
+      relationship: editBeneficiary.relationship,
+      percentage: parseFloat(editBeneficiary.percentage),
+      isPrimary: editBeneficiary.isPrimary
+    };
+    
+    const updatedAccounts = accounts.map(account => 
+      account.id === selectedAccount.id 
+        ? { 
+            ...account, 
+            beneficiaries: account.beneficiaries.map(ben => 
+              ben.id === editingBeneficiary.id ? updatedBeneficiary : ben
+            ),
+            lastUpdated: new Date() 
+          }
+        : account
+    );
+    
+    setAccounts(updatedAccounts);
+    setEditBeneficiary({ name: '', relationship: '', percentage: '', ssn: '', isPrimary: true });
+    setShowEditBeneficiary(false);
+    setSelectedAccount(null);
+    setEditingBeneficiary(null);
+    
+    // Add audit log entry
+    setAuditLog([{
+      id: Date.now().toString(),
+      timestamp: new Date(),
+      action: 'UPDATE_BENEFICIARY',
+      accountId: selectedAccount.id,
+      details: `Updated beneficiary: ${updatedBeneficiary.name} (${updatedBeneficiary.percentage}%)`,
+      status: 'SUCCESS',
+      institutionResponse: 'PROCESSED'
+    }, ...auditLog]);
+  };
+
+  const handleDeleteBeneficiary = (accountId, beneficiaryId, beneficiaryName) => {
+    const updatedAccounts = accounts.map(account => 
+      account.id === accountId 
+        ? { 
+            ...account, 
+            beneficiaries: account.beneficiaries.filter(ben => ben.id !== beneficiaryId),
+            lastUpdated: new Date() 
+          }
+        : account
+    );
+    
+    setAccounts(updatedAccounts);
+    
+    // Add audit log entry
+    setAuditLog([{
+      id: Date.now().toString(),
+      timestamp: new Date(),
+      action: 'DELETE_BENEFICIARY',
+      accountId: accountId,
+      details: `Removed beneficiary: ${beneficiaryName}`,
+      status: 'SUCCESS',
+      institutionResponse: 'PROCESSED'
+    }, ...auditLog]);
+  };
+
+  const openEditBeneficiary = (account, beneficiary) => {
+    setSelectedAccount(account);
+    setEditingBeneficiary(beneficiary);
+    setEditBeneficiary({
+      name: beneficiary.name,
+      relationship: beneficiary.relationship,
+      percentage: beneficiary.percentage.toString(),
+      ssn: beneficiary.ssn,
+      isPrimary: beneficiary.isPrimary
+    });
+    setShowEditBeneficiary(true);
+  };
+
   const pushToInstitution = (accountId) => {
     // Simulate API push
     setAuditLog([{
@@ -231,97 +323,132 @@ const BeneficiaryDesignationAPI = () => {
       </div>
 
       <div className="grid gap-6">
-        {accounts.map(account => (
-          <div key={account.id} className="card animate-slide-up">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">{account.accountType}</h3>
-                <p className="text-gray-600">{account.accountNumber}</p>
-                <p className="text-sm text-gray-500">{getInstitutionName(account.institution)}</p>
+        {accounts.map(account => {
+          const totalPercentage = calculateTotalPercentage(account.beneficiaries);
+          
+          return (
+            <div key={account.id} className="card animate-slide-up">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">{account.accountType}</h3>
+                  <p className="text-gray-600">{account.accountNumber}</p>
+                  <p className="text-sm text-gray-500">{getInstitutionName(account.institution)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-green-600">
+                    ${account.balance.toLocaleString()}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {getInstitutionStatus(account.institution) ? (
+                      <span className="status-connected">
+                        <Check size={16} />
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="status-disconnected">
+                        <AlertCircle size={16} />
+                        Manual Only
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-600">
-                  ${account.balance.toLocaleString()}
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-4">
+                    <h4 className="font-semibold text-gray-900">Beneficiaries</h4>
+                    {account.beneficiaries.length > 0 && (
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        totalPercentage === 100 
+                          ? 'bg-green-100 text-green-800' 
+                          : totalPercentage > 100 
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        Total: {totalPercentage}%
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedAccount(account);
+                      setShowAddBeneficiary(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add Beneficiary
+                  </button>
+                </div>
+
+                {account.beneficiaries.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No beneficiaries designated</p>
+                ) : (
+                  <div className="space-y-2">
+                    {account.beneficiaries.map(beneficiary => (
+                      <div key={beneficiary.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900">{beneficiary.name}</p>
+                          <p className="text-sm text-gray-600">{beneficiary.relationship} • {beneficiary.ssn}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-900">{beneficiary.percentage}%</p>
+                            <p className="text-xs text-gray-500">
+                              {beneficiary.isPrimary ? 'Primary' : 'Contingent'}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => openEditBeneficiary(account, beneficiary)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit beneficiary"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBeneficiary(account.id, beneficiary.id, beneficiary.name)}
+                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                              title="Delete beneficiary"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 mt-4 flex justify-between items-center">
+                <p className="text-sm text-gray-500">
+                  Last updated: {account.lastUpdated.toLocaleDateString()}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex gap-2">
                   {getInstitutionStatus(account.institution) ? (
-                    <span className="status-connected">
-                      <Check size={16} />
-                      Connected
-                    </span>
+                    <button
+                      onClick={() => pushToInstitution(account.id)}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors"
+                    >
+                      <Send size={14} />
+                      Push Update
+                    </button>
                   ) : (
-                    <span className="status-disconnected">
-                      <AlertCircle size={16} />
-                      Manual Only
-                    </span>
+                    <button
+                      onClick={() => generatePDF(account.id)}
+                      className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors"
+                    >
+                      <FileText size={14} />
+                      Generate PDF
+                    </button>
                   )}
                 </div>
               </div>
             </div>
-
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold text-gray-900">Beneficiaries</h4>
-                <button
-                  onClick={() => {
-                    setSelectedAccount(account);
-                    setShowAddBeneficiary(true);
-                  }}
-                  className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 transition-colors"
-                >
-                  <Plus size={16} />
-                  Add Beneficiary
-                </button>
-              </div>
-
-              {account.beneficiaries.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No beneficiaries designated</p>
-              ) : (
-                <div className="space-y-2">
-                  {account.beneficiaries.map(beneficiary => (
-                    <div key={beneficiary.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{beneficiary.name}</p>
-                        <p className="text-sm text-gray-600">{beneficiary.relationship} • {beneficiary.ssn}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">{beneficiary.percentage}%</p>
-                        <p className="text-xs text-gray-500">
-                          {beneficiary.isPrimary ? 'Primary' : 'Contingent'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t pt-4 mt-4 flex justify-between items-center">
-              <p className="text-sm text-gray-500">
-                Last updated: {account.lastUpdated.toLocaleDateString()}
-              </p>
-              <div className="flex gap-2">
-                {getInstitutionStatus(account.institution) ? (
-                  <button
-                    onClick={() => pushToInstitution(account.id)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors"
-                  >
-                    <Send size={14} />
-                    Push Update
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => generatePDF(account.id)}
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors"
-                  >
-                    <FileText size={14} />
-                    Generate PDF
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -646,6 +773,97 @@ const BeneficiaryDesignationAPI = () => {
                   className="btn-primary flex-1"
                 >
                   Add Beneficiary
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Beneficiary Modal */}
+        {showEditBeneficiary && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Beneficiary</h3>
+                <button
+                  onClick={() => setShowEditBeneficiary(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editBeneficiary.name}
+                    onChange={(e) => setEditBeneficiary({...editBeneficiary, name: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter full name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Relationship
+                  </label>
+                  <select
+                    value={editBeneficiary.relationship}
+                    onChange={(e) => setEditBeneficiary({...editBeneficiary, relationship: e.target.value})}
+                    className="input-field"
+                  >
+                    <option value="">Select relationship</option>
+                    {relationshipTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Percentage
+                  </label>
+                  <input
+                    type="number"
+                    value={editBeneficiary.percentage}
+                    onChange={(e) => setEditBeneficiary({...editBeneficiary, percentage: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter percentage (0-100)"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsPrimary"
+                    checked={editBeneficiary.isPrimary}
+                    onChange={(e) => setEditBeneficiary({...editBeneficiary, isPrimary: e.target.checked})}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="editIsPrimary" className="text-sm text-gray-700">
+                    Primary Beneficiary
+                  </label>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowEditBeneficiary(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditBeneficiary}
+                  className="btn-primary flex-1"
+                >
+                  Update Beneficiary
                 </button>
               </div>
             </div>
