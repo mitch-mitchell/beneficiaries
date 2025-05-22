@@ -55,6 +55,7 @@ const BeneficiaryDesignationAPI = () => {
       accountType: 'Traditional IRA',
       institution: 'fidelity',
       balance: 125000,
+      hasUnsavedChanges: false,
       beneficiaries: [
         { id: '1', name: 'Sarah Johnson', relationship: 'Spouse', percentage: 60, ssn: '***-**-1234', isPrimary: true },
         { id: '2', name: 'Michael Johnson', relationship: 'Child', percentage: 40, ssn: '***-**-5678', isPrimary: true }
@@ -67,6 +68,7 @@ const BeneficiaryDesignationAPI = () => {
       accountType: 'Brokerage Account',
       institution: 'schwab',
       balance: 85000,
+      hasUnsavedChanges: false,
       beneficiaries: [
         { id: '3', name: 'Sarah Johnson', relationship: 'Spouse', percentage: 100, ssn: '***-**-1234', isPrimary: true }
       ],
@@ -129,6 +131,12 @@ const BeneficiaryDesignationAPI = () => {
     ssn: '',
     isPrimary: true
   });
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [selectedSubmitAccount, setSelectedSubmitAccount] = useState(null);
+  const [pendingChanges, setPendingChanges] = useState(new Set());
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [submittedInstitution, setSubmittedInstitution] = useState('');
 
   const calculateTotalPercentage = (beneficiaries) => {
     return beneficiaries.reduce((total, beneficiary) => total + beneficiary.percentage, 0);
@@ -142,7 +150,8 @@ const BeneficiaryDesignationAPI = () => {
       ...newAccount,
       balance: parseFloat(newAccount.balance) || 0,
       beneficiaries: [],
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      hasUnsavedChanges: false
     };
     
     setAccounts([...accounts, account]);
@@ -173,11 +182,17 @@ const BeneficiaryDesignationAPI = () => {
     
     const updatedAccounts = accounts.map(account => 
       account.id === selectedAccount.id 
-        ? { ...account, beneficiaries: [...account.beneficiaries, beneficiary], lastUpdated: new Date() }
+        ? { 
+            ...account, 
+            beneficiaries: [...account.beneficiaries, beneficiary], 
+            lastUpdated: new Date(),
+            hasUnsavedChanges: true
+          }
         : account
     );
     
     setAccounts(updatedAccounts);
+    setPendingChanges(new Set([...pendingChanges, selectedAccount.id]));
     setNewBeneficiary({ name: '', relationship: '', percentage: '', ssn: '', isPrimary: true });
     setShowAddBeneficiary(false);
     setSelectedAccount(null);
@@ -188,9 +203,9 @@ const BeneficiaryDesignationAPI = () => {
       timestamp: new Date(),
       action: 'ADD_BENEFICIARY',
       accountId: selectedAccount.id,
-      details: `Added new beneficiary: ${beneficiary.name} (${beneficiary.percentage}%)`,
-      status: 'SUCCESS',
-      institutionResponse: 'PROCESSED'
+      details: `Added new beneficiary: ${beneficiary.name} (${beneficiary.percentage}%) - PENDING SUBMISSION`,
+      status: 'PENDING',
+      institutionResponse: 'NOT_SUBMITTED'
     }, ...auditLog]);
   };
 
@@ -212,12 +227,14 @@ const BeneficiaryDesignationAPI = () => {
             beneficiaries: account.beneficiaries.map(ben => 
               ben.id === editingBeneficiary.id ? updatedBeneficiary : ben
             ),
-            lastUpdated: new Date() 
+            lastUpdated: new Date(),
+            hasUnsavedChanges: true
           }
         : account
     );
     
     setAccounts(updatedAccounts);
+    setPendingChanges(new Set([...pendingChanges, selectedAccount.id]));
     setEditBeneficiary({ name: '', relationship: '', percentage: '', ssn: '', isPrimary: true });
     setShowEditBeneficiary(false);
     setSelectedAccount(null);
@@ -229,9 +246,9 @@ const BeneficiaryDesignationAPI = () => {
       timestamp: new Date(),
       action: 'UPDATE_BENEFICIARY',
       accountId: selectedAccount.id,
-      details: `Updated beneficiary: ${updatedBeneficiary.name} (${updatedBeneficiary.percentage}%)`,
-      status: 'SUCCESS',
-      institutionResponse: 'PROCESSED'
+      details: `Updated beneficiary: ${updatedBeneficiary.name} (${updatedBeneficiary.percentage}%) - PENDING SUBMISSION`,
+      status: 'PENDING',
+      institutionResponse: 'NOT_SUBMITTED'
     }, ...auditLog]);
   };
 
@@ -241,12 +258,14 @@ const BeneficiaryDesignationAPI = () => {
         ? { 
             ...account, 
             beneficiaries: account.beneficiaries.filter(ben => ben.id !== beneficiaryId),
-            lastUpdated: new Date() 
+            lastUpdated: new Date(),
+            hasUnsavedChanges: true
           }
         : account
     );
     
     setAccounts(updatedAccounts);
+    setPendingChanges(new Set([...pendingChanges, accountId]));
     
     // Add audit log entry
     setAuditLog([{
@@ -254,9 +273,9 @@ const BeneficiaryDesignationAPI = () => {
       timestamp: new Date(),
       action: 'DELETE_BENEFICIARY',
       accountId: accountId,
-      details: `Removed beneficiary: ${beneficiaryName}`,
-      status: 'SUCCESS',
-      institutionResponse: 'PROCESSED'
+      details: `Removed beneficiary: ${beneficiaryName} - PENDING SUBMISSION`,
+      status: 'PENDING',
+      institutionResponse: 'NOT_SUBMITTED'
     }, ...auditLog]);
   };
 
@@ -273,17 +292,55 @@ const BeneficiaryDesignationAPI = () => {
     setShowEditBeneficiary(true);
   };
 
-  const pushToInstitution = (accountId) => {
-    // Simulate API push
+  const openSubmitModal = (account) => {
+    setSelectedSubmitAccount(account);
+    setShowSubmitModal(true);
+  };
+
+  const handleSubmitChanges = () => {
+    const institutionName = getInstitutionName(selectedSubmitAccount.institution);
+    setSubmittedInstitution(institutionName);
+    
+    // Update the account to remove unsaved changes flag
+    const updatedAccounts = accounts.map(account => 
+      account.id === selectedSubmitAccount.id 
+        ? { ...account, hasUnsavedChanges: false, lastSubmitted: new Date() }
+        : account
+    );
+    setAccounts(updatedAccounts);
+    
+    // Remove from pending changes
+    const newPendingChanges = new Set(pendingChanges);
+    newPendingChanges.delete(selectedSubmitAccount.id);
+    setPendingChanges(newPendingChanges);
+    
+    // Add audit log entry
     setAuditLog([{
       id: Date.now().toString(),
       timestamp: new Date(),
-      action: 'PUSH_UPDATE',
-      accountId: accountId,
-      details: 'Pushed beneficiary updates to institution',
+      action: 'SUBMIT_CHANGES',
+      accountId: selectedSubmitAccount.id,
+      details: `Successfully submitted beneficiary changes to ${institutionName}`,
       status: 'SUCCESS',
-      institutionResponse: 'ACK_RECEIVED'
+      institutionResponse: 'CHANGES_ACCEPTED'
     }, ...auditLog]);
+    
+    setShowSubmitModal(false);
+    setShowSuccessModal(true);
+  };
+
+  const handleCancelSubmit = () => {
+    setShowSubmitModal(false);
+    setShowCancelModal(true);
+  };
+
+  const getChangeSummary = (account) => {
+    // This would normally compare with saved state, but for demo we'll show current beneficiaries
+    const changes = [];
+    account.beneficiaries.forEach(beneficiary => {
+      changes.push(`${beneficiary.name} - ${beneficiary.percentage}% (${beneficiary.relationship})`);
+    });
+    return changes;
   };
 
   const generatePDF = (accountId) => {
@@ -330,7 +387,14 @@ const BeneficiaryDesignationAPI = () => {
             <div key={account.id} className="card animate-slide-up">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900">{account.accountType}</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-semibold text-gray-900">{account.accountType}</h3>
+                    {account.hasUnsavedChanges && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                        Unsaved Changes
+                      </span>
+                    )}
+                  </div>
                   <p className="text-gray-600">{account.accountNumber}</p>
                   <p className="text-sm text-gray-500">{getInstitutionName(account.institution)}</p>
                 </div>
@@ -425,15 +489,23 @@ const BeneficiaryDesignationAPI = () => {
               <div className="border-t pt-4 mt-4 flex justify-between items-center">
                 <p className="text-sm text-gray-500">
                   Last updated: {account.lastUpdated.toLocaleDateString()}
+                  {account.lastSubmitted && (
+                    <span className="ml-2">• Last submitted: {account.lastSubmitted.toLocaleDateString()}</span>
+                  )}
                 </p>
                 <div className="flex gap-2">
                   {getInstitutionStatus(account.institution) ? (
                     <button
-                      onClick={() => pushToInstitution(account.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors"
+                      onClick={() => openSubmitModal(account)}
+                      disabled={!account.hasUnsavedChanges}
+                      className={`px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors ${
+                        account.hasUnsavedChanges 
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
                     >
                       <Send size={14} />
-                      Push Update
+                      Submit Changes
                     </button>
                   ) : (
                     <button
@@ -521,7 +593,9 @@ const BeneficiaryDesignationAPI = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      entry.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      entry.status === 'SUCCESS' ? 'bg-green-100 text-green-800' : 
+                      entry.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
                     }`}>
                       {entry.action.replace('_', ' ')}
                     </span>
@@ -537,6 +611,8 @@ const BeneficiaryDesignationAPI = () => {
                 <div className="ml-4">
                   {entry.status === 'SUCCESS' ? (
                     <Check size={20} className="text-green-600" />
+                  ) : entry.status === 'PENDING' ? (
+                    <AlertCircle size={20} className="text-yellow-600" />
                   ) : (
                     <AlertCircle size={20} className="text-red-600" />
                   )}
@@ -866,6 +942,112 @@ const BeneficiaryDesignationAPI = () => {
                   Update Beneficiary
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Changes Confirmation Modal */}
+        {showSubmitModal && selectedSubmitAccount && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-lg mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Confirm Changes Submission</h3>
+                <button
+                  onClick={() => setShowSubmitModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Are you sure that you want to submit these changes to <strong>{getInstitutionName(selectedSubmitAccount.institution)}</strong>?
+                </p>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Account: {selectedSubmitAccount.accountNumber}</h4>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Current Beneficiaries:</h5>
+                  <ul className="space-y-1 text-sm text-gray-600">
+                    {getChangeSummary(selectedSubmitAccount).map((change, index) => (
+                      <li key={index}>• {change}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelSubmit}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitChanges}
+                  className="btn-primary flex-1"
+                >
+                  Yes, confirm and submit changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                  <Check size={24} className="text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Changes Submitted Successfully</h3>
+                  <p className="text-gray-600">Your changes have been sent to {submittedInstitution}</p>
+                </div>
+              </div>
+              
+              <p className="text-gray-700 mb-6">
+                The changes were successfully submitted to <strong>{submittedInstitution}</strong>. 
+                You should receive confirmation within 24-48 hours.
+              </p>
+              
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="btn-primary w-full"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Modal */}
+        {showCancelModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                  <X size={24} className="text-gray-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Submission Cancelled</h3>
+                  <p className="text-gray-600">No changes were saved or sent</p>
+                </div>
+              </div>
+              
+              <p className="text-gray-700 mb-6">
+                No changes have been saved or sent to your financial institution. 
+                Your unsaved changes are still available for editing.
+              </p>
+              
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="btn-primary w-full"
+              >
+                Continue
+              </button>
             </div>
           </div>
         )}
