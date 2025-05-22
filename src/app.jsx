@@ -142,6 +142,40 @@ const BeneficiaryDesignationAPI = () => {
     return beneficiaries.reduce((total, beneficiary) => total + beneficiary.percentage, 0);
   };
 
+  const calculatePrimaryPercentage = (beneficiaries) => {
+    return beneficiaries
+      .filter(beneficiary => beneficiary.isPrimary)
+      .reduce((total, beneficiary) => total + beneficiary.percentage, 0);
+  };
+
+  const calculateContingentPercentage = (beneficiaries) => {
+    return beneficiaries
+      .filter(beneficiary => !beneficiary.isPrimary)
+      .reduce((total, beneficiary) => total + beneficiary.percentage, 0);
+  };
+
+  const getPrimaryBeneficiaries = (beneficiaries) => {
+    return beneficiaries.filter(beneficiary => beneficiary.isPrimary);
+  };
+
+  const getContingentBeneficiaries = (beneficiaries) => {
+    return beneficiaries.filter(beneficiary => !beneficiary.isPrimary);
+  };
+
+  const canSubmitChanges = (account) => {
+    const primaryPercentage = calculatePrimaryPercentage(account.beneficiaries);
+    const contingentBeneficiaries = getContingentBeneficiaries(account.beneficiaries);
+    const contingentPercentage = calculateContingentPercentage(account.beneficiaries);
+    
+    // Must have primary beneficiaries totaling 100%
+    if (primaryPercentage !== 100) return false;
+    
+    // If there are contingent beneficiaries, they must also total 100%
+    if (contingentBeneficiaries.length > 0 && contingentPercentage !== 100) return false;
+    
+    return true;
+  };
+
   const handleAddAccount = () => {
     if (!newAccount.accountNumber || !newAccount.accountType || !newAccount.institution) return;
     
@@ -381,7 +415,11 @@ const BeneficiaryDesignationAPI = () => {
 
       <div className="grid gap-6">
         {accounts.map(account => {
-          const totalPercentage = calculateTotalPercentage(account.beneficiaries);
+          const primaryBeneficiaries = getPrimaryBeneficiaries(account.beneficiaries);
+          const contingentBeneficiaries = getContingentBeneficiaries(account.beneficiaries);
+          const primaryPercentage = calculatePrimaryPercentage(account.beneficiaries);
+          const contingentPercentage = calculateContingentPercentage(account.beneficiaries);
+          const canSubmit = canSubmitChanges(account);
           
           return (
             <div key={account.id} className="card animate-slide-up">
@@ -422,29 +460,6 @@ const BeneficiaryDesignationAPI = () => {
                 <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center gap-4">
                     <h4 className="font-semibold text-gray-900">Beneficiaries</h4>
-                    {account.beneficiaries.length > 0 && (
-                      <div className="flex items-center gap-3">
-                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          totalPercentage === 100 
-                            ? 'bg-green-100 text-green-800' 
-                            : totalPercentage > 100 
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          Total: {totalPercentage}%
-                        </div>
-                        {totalPercentage !== 100 && (
-                          <div className="flex items-center gap-1 text-sm text-red-600">
-                            <AlertCircle size={16} />
-                            <span>
-                              {totalPercentage > 100 
-                                ? 'Total exceeds 100%. Cannot submit until fixed.' 
-                                : 'Total must equal 100% to submit changes.'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <button
                     onClick={() => {
@@ -471,39 +486,149 @@ const BeneficiaryDesignationAPI = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {account.beneficiaries.map(beneficiary => (
-                      <div key={beneficiary.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-900">{beneficiary.name}</p>
-                          <p className="text-sm text-gray-600">{beneficiary.relationship} • {beneficiary.ssn}</p>
-                        </div>
+                  <div className="space-y-4">
+                    {/* Primary Beneficiaries Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">{beneficiary.percentage}%</p>
-                            <p className="text-xs text-gray-500">
-                              {beneficiary.isPrimary ? 'Primary' : 'Contingent'}
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => openEditBeneficiary(account, beneficiary)}
-                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                              title="Edit beneficiary"
-                            >
-                              <Edit3 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBeneficiary(account.id, beneficiary.id, beneficiary.name)}
-                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                              title="Delete beneficiary"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                          <h5 className="font-medium text-gray-900">Primary Beneficiaries</h5>
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            primaryPercentage === 100 
+                              ? 'bg-green-100 text-green-800' 
+                              : primaryPercentage > 100 
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            Total: {primaryPercentage}%
                           </div>
                         </div>
                       </div>
-                    ))}
+                      
+                      {primaryPercentage !== 100 && (
+                        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 rounded-lg">
+                          <AlertCircle size={16} className="text-red-600" />
+                          <span className="text-sm text-red-700">
+                            {primaryPercentage > 100 
+                              ? 'Primary beneficiaries exceed 100%. Please adjust percentages.' 
+                              : primaryPercentage === 0
+                                ? 'Primary beneficiaries are required and must total 100%.'
+                                : 'Primary beneficiaries must total 100% to submit changes.'}
+                          </span>
+                        </div>
+                      )}
+
+                      {primaryBeneficiaries.length === 0 ? (
+                        <div className="p-3 bg-orange-50 rounded-lg">
+                          <p className="text-orange-700 text-sm">No primary beneficiaries designated. Primary beneficiaries are required.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {primaryBeneficiaries.map(beneficiary => (
+                            <div key={beneficiary.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-gray-900">{beneficiary.name}</p>
+                                <p className="text-sm text-gray-600">{beneficiary.relationship} • {beneficiary.ssn}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className="font-semibold text-gray-900">{beneficiary.percentage}%</p>
+                                  <p className="text-xs text-gray-500">Primary</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => openEditBeneficiary(account, beneficiary)}
+                                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                    title="Edit beneficiary"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteBeneficiary(account.id, beneficiary.id, beneficiary.name)}
+                                    className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                    title="Delete beneficiary"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contingent Beneficiaries Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <h5 className="font-medium text-gray-900">Contingent Beneficiaries</h5>
+                          {contingentBeneficiaries.length > 0 && (
+                            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              contingentPercentage === 100 
+                                ? 'bg-green-100 text-green-800' 
+                                : contingentPercentage > 100 
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              Total: {contingentPercentage}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {contingentBeneficiaries.length > 0 && contingentPercentage !== 100 && (
+                        <div className="flex items-center gap-2 mb-3 p-2 bg-red-50 rounded-lg">
+                          <AlertCircle size={16} className="text-red-600" />
+                          <span className="text-sm text-red-700">
+                            {contingentPercentage > 100 
+                              ? 'Contingent beneficiaries exceed 100%. Please adjust percentages.' 
+                              : 'Contingent beneficiaries must total 100% when designated.'}
+                          </span>
+                        </div>
+                      )}
+
+                      {contingentBeneficiaries.length === 0 ? (
+                        <div className="p-3 bg-blue-50 rounded-lg">
+                          <p className="text-blue-700 text-sm">
+                            <strong>Recommendation:</strong> Consider adding contingent beneficiaries. 
+                            They receive assets if primary beneficiaries are unavailable.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {contingentBeneficiaries.map(beneficiary => (
+                            <div key={beneficiary.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-gray-900">{beneficiary.name}</p>
+                                <p className="text-sm text-gray-600">{beneficiary.relationship} • {beneficiary.ssn}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className="font-semibold text-gray-900">{beneficiary.percentage}%</p>
+                                  <p className="text-xs text-gray-500">Contingent</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => openEditBeneficiary(account, beneficiary)}
+                                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                    title="Edit beneficiary"
+                                  >
+                                    <Edit3 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteBeneficiary(account.id, beneficiary.id, beneficiary.name)}
+                                    className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                    title="Delete beneficiary"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -519,17 +644,17 @@ const BeneficiaryDesignationAPI = () => {
                   {getInstitutionStatus(account.institution) ? (
                     <button
                       onClick={() => openSubmitModal(account)}
-                      disabled={!account.hasUnsavedChanges || totalPercentage !== 100}
+                      disabled={!account.hasUnsavedChanges || !canSubmit}
                       className={`px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors ${
-                        account.hasUnsavedChanges && totalPercentage === 100
+                        account.hasUnsavedChanges && canSubmit
                           ? 'bg-blue-600 hover:bg-blue-700 text-white'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                       title={
                         !account.hasUnsavedChanges 
                           ? 'No changes to submit'
-                          : totalPercentage !== 100
-                            ? 'Cannot submit - beneficiary percentages must total 100%'
+                          : !canSubmit
+                            ? 'Cannot submit - primary beneficiaries must total 100%, and contingent beneficiaries (if any) must also total 100%'
                             : 'Submit changes to institution'
                       }
                     >
