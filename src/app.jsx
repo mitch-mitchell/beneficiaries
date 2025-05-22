@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Eye,
   Download,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 // Mock data and utilities
@@ -471,4 +472,188 @@ const BeneficiaryDesignationAPI = () => {
         {/* Add Account Modal */}
         {showAddAccount && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Add New Account</h3>
+                <button
+                  onClick={() => setShowAddAccount(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Account Number
+                  </label>
+                  <input
+                    type="text"
+                    value={newAccount.accountNumber}
+                    onChange={(e) => setNewAccount({...newAccount, accountNumber: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter account number"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Account Type
+                  </label>
+                  <select
+                    value={newAccount.accountType}
+                    onChange={(e) => setNewAccount({...newAccount, accountType: e.target.value})}
+                    className="input-field"
+                  >
+                    <option value="">Select account type</option>
+                    {accountTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Institution
+                  </label>
+                  <select
+                    value={newAccount.institution}
+                    onChange={(e) => setNewAccount({...newAccount, institution: e.target.value})}
+                    className="input-field"
+                  >
+                    <option value="">Select institution</option>
+                    {mockInstitutions.map(inst => (
+                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Balance
+                  </label>
+                  <input
+                    type="number"
+                    value={newAccount.balance}
+                    onChange={(e) => setNewAccount({...newAccount, balance: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter balance"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowAddAccount(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddAccount}
+                  className="btn-primary flex-1"
+                >
+                  Add Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Beneficiary Modal */}
+        {showAddBeneficiary && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Add Beneficiary</h3>
+                <button
+                  onClick={() => setShowAddBeneficiary(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newBeneficiary.name}
+                    onChange={(e) => setNewBeneficiary({...newBeneficiary, name: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter full name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Relationship
+                  </label>
+                  <select
+                    value={newBeneficiary.relationship}
+                    onChange={(e) => setNewBeneficiary({...newBeneficiary, relationship: e.target.value})}
+                    className="input-field"
+                  >
+                    <option value="">Select relationship</option>
+                    {relationshipTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Percentage
+                  </label>
+                  <input
+                    type="number"
+                    value={newBeneficiary.percentage}
+                    onChange={(e) => setNewBeneficiary({...newBeneficiary, percentage: e.target.value})}
+                    className="input-field"
+                    placeholder="Enter percentage (0-100)"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isPrimary"
+                    checked={newBeneficiary.isPrimary}
+                    onChange={(e) => setNewBeneficiary({...newBeneficiary, isPrimary: e.target.checked})}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="isPrimary" className="text-sm text-gray-700">
+                    Primary Beneficiary
+                  </label>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowAddBeneficiary(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddBeneficiary}
+                  className="btn-primary flex-1"
+                >
+                  Add Beneficiary
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default BeneficiaryDesignationAPI;
