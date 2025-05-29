@@ -53,6 +53,8 @@ const BeneficiaryDesignationAPI = () => {
       id: '1',
       accountNumber: 'IRA-001234',
       accountType: 'Traditional IRA',
+      accountTitle: 'John M. Smith IRA',
+      owner: 'John M. Smith',
       institution: 'fidelity',
       balance: 125000,
       hasUnsavedChanges: false,
@@ -66,6 +68,8 @@ const BeneficiaryDesignationAPI = () => {
       id: '2', 
       accountNumber: 'BRK-567890',
       accountType: 'Brokerage Account',
+      accountTitle: 'John M. Smith Individual Taxable Account',
+      owner: 'John M. Smith',
       institution: 'schwab',
       balance: 85000,
       hasUnsavedChanges: false,
@@ -114,6 +118,7 @@ const BeneficiaryDesignationAPI = () => {
   const [newAccount, setNewAccount] = useState({
     accountNumber: '',
     accountType: '',
+    accountTitle: '',
     institution: '',
     balance: ''
   });
@@ -182,6 +187,8 @@ const BeneficiaryDesignationAPI = () => {
     const account = {
       id: Date.now().toString(),
       ...newAccount,
+      accountTitle: newAccount.accountTitle || `${newAccount.accountType}`, // Default if not provided
+      owner: 'John M. Smith', // This would come from auth/profile context
       balance: parseFloat(newAccount.balance) || 0,
       beneficiaries: [],
       lastUpdated: new Date(),
@@ -189,7 +196,7 @@ const BeneficiaryDesignationAPI = () => {
     };
     
     setAccounts([...accounts, account]);
-    setNewAccount({ accountNumber: '', accountType: '', institution: '', balance: '' });
+    setNewAccount({ accountNumber: '', accountType: '', accountTitle: '', institution: '', balance: '' });
     setShowAddAccount(false);
     
     // Add audit log entry
@@ -424,8 +431,8 @@ const BeneficiaryDesignationAPI = () => {
           return (
             <div key={account.id} className="card animate-slide-up">
               <div className="flex justify-between items-start mb-4">
-                <div>
-                  <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
                     <h3 className="text-xl font-semibold text-gray-900">{account.accountType}</h3>
                     {account.hasUnsavedChanges && (
                       <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
@@ -433,8 +440,13 @@ const BeneficiaryDesignationAPI = () => {
                       </span>
                     )}
                   </div>
-                  <p className="text-gray-600">{account.accountNumber}</p>
-                  <p className="text-sm text-gray-500">{getInstitutionName(account.institution)}</p>
+                  <p className="text-lg font-medium text-gray-700 mb-1">{account.accountTitle}</p>
+                  <p className="text-gray-600 mb-1">{account.accountNumber}</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>Owner: {account.owner}</span>
+                    <span>•</span>
+                    <span>{getInstitutionName(account.institution)}</span>
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-green-600">
@@ -794,7 +806,7 @@ const BeneficiaryDesignationAPI = () => {
 
         {/* Navigation */}
         <div className="card mb-8">
-          <div className="flex border-b border-gray-200">
+          <div className="flex flex-wrap border-b border-gray-200">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: User },
               { id: 'integrations', label: 'Integrations', icon: Building2 },
@@ -805,14 +817,14 @@ const BeneficiaryDesignationAPI = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 sm:px-6 py-4 font-medium transition-colors text-sm sm:text-base flex-1 sm:flex-initial justify-center sm:justify-start ${
                     activeTab === tab.id
                       ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <Icon size={20} />
-                  {tab.label}
+                  <span className="hidden xs:inline sm:inline">{tab.label}</span>
                 </button>
               );
             })}
@@ -868,6 +880,22 @@ const BeneficiaryDesignationAPI = () => {
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Account Title/Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newAccount.accountTitle}
+                    onChange={(e) => setNewAccount({...newAccount, accountTitle: e.target.value})}
+                    className="input-field"
+                    placeholder="e.g., John Smith IRA"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Full account title as it appears at the institution
+                  </p>
                 </div>
                 
                 <div>
@@ -977,17 +1005,38 @@ const BeneficiaryDesignationAPI = () => {
                   />
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isPrimary"
-                    checked={newBeneficiary.isPrimary}
-                    onChange={(e) => setNewBeneficiary({...newBeneficiary, isPrimary: e.target.checked})}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="isPrimary" className="text-sm text-gray-700">
-                    Primary Beneficiary
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Beneficiary Type
                   </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        id="isPrimaryTrue"
+                        name="beneficiaryType"
+                        checked={newBeneficiary.isPrimary === true}
+                        onChange={() => setNewBeneficiary({...newBeneficiary, isPrimary: true})}
+                        className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="isPrimaryTrue" className="text-sm text-gray-700">
+                        Primary Beneficiary
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        id="isPrimaryFalse"
+                        name="beneficiaryType"
+                        checked={newBeneficiary.isPrimary === false}
+                        onChange={() => setNewBeneficiary({...newBeneficiary, isPrimary: false})}
+                        className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="isPrimaryFalse" className="text-sm text-gray-700">
+                        Contingent Beneficiary
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               
