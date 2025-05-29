@@ -796,11 +796,16 @@ const BeneficiaryDesignationAPI = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Beneficiary Designation API
-          </h1>
+          <div className="flex items-center gap-4 mb-2">
+            <h1 className="text-4xl font-bold text-gray-900">
+              Beneficiaries
+            </h1>
+            <span className="px-3 py-1 bg-red-100 text-red-800 text-sm font-semibold rounded-full border border-red-200">
+              Non-working Demo
+            </span>
+          </div>
           <p className="text-gray-600 text-lg">
-            Streamlined beneficiary management across financial institutions
+            A proof of concept API for streamlined beneficiary management across financial institutions
           </p>
         </div>
 
